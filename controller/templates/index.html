@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Ansible 运维平台</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        h1 { color: #4ec9b0; }
+        select, button { padding: 8px 16px; margin: 5px; font-size: 14px; }
+        button { background: #0e639c; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #log { background: #0d0d0d; border: 1px solid #333; padding: 15px;
+               height: 400px; overflow-y: auto; white-space: pre-wrap;
+               font-size: 13px; margin-top: 15px; }
+        .success { color: #4ec9b0; }
+        .failed  { color: #f44747; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #333; padding: 8px 12px; text-align: left; }
+        th { background: #2d2d2d; color: #9cdcfe; }
+    </style>
+</head>
+<body>
+    <h1>Ansible 自动化运维平台</h1>
+
+    <div>
+        <label>Playbook：</label>
+        <select id="playbook">
+            <option value="init">init（服务器初始化）</option>
+            <option value="node_exporter">node_exporter（部署监控）</option>
+        </select>
+
+        <label>目标主机组：</label>
+        <select id="hosts">
+            <option value="monitored">monitored（全部节点）</option>
+            <option value="webservers">webservers（node1）</option>
+            <option value="dbservers">dbservers（node2）</option>
+        </select>
+
+        <button id="runBtn" onclick="runPlaybook()">▶ 执行</button>
+    </div>
+
+    <div id="log">等待执行...</div>
+
+    <h2>执行历史</h2>
+    <table>
+        <tr><th>时间</th><th>Playbook</th><th>目标</th><th>状态</th><th>耗时(s)</th></tr>
+        {% for row in history %}
+        <tr>
+            <td>{{ row[1] }}</td>
+            <td>{{ row[2] }}</td>
+            <td>{{ row[3] }}</td>
+            <td class="{{ row[4] }}">{{ row[4] }}</td>
+            <td>{{ row[5] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <script>
+        const socket = io();
+        const logDiv = document.getElementById('log');
+
+        socket.on('log', function(data) {
+            logDiv.textContent += data.data;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        });
+
+        socket.on('done', function(data) {
+            logDiv.textContent += '\n--- 执行' + data.status + '，耗时 ' + data.duration + ' 秒 ---\n';
+            document.getElementById('runBtn').disabled = false;
+            setTimeout(() => location.reload(), 2000);
+        });
+
+        function runPlaybook() {
+            const playbook = document.getElementById('playbook').value;
+            const hosts    = document.getElementById('hosts').value;
+            logDiv.textContent = '正在执行...\n';
+            document.getElementById('runBtn').disabled = true;
+            socket.emit('run_playbook', { playbook, hosts });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+---
+- name: 安装基础工具
+  apt:
+    name:
+      - ufw
+      - curl
+      - vim
+    state: present
+    update_cache: yes
+
+- name: 创建运维用户 ops
+  user:
+    name: ops
+    shell: /bin/bash
+    create_home: yes
+
+- name: 配置 ops 用户免密 sudo
+  lineinfile:
+    path: /etc/sudoers
+    line: "ops ALL=(ALL) NOPASSWD:ALL"
+    validate: "visudo -cf %s"
+
+- name: 设置时区为上海
+  timezone:
+    name: Asia/Shanghai
+
+- name: 放行 SSH 端口
+  ufw:
+    rule: allow
+    port: "22"
+
+- name: 放行 HTTP 端口
+  ufw:
+    rule: allow
+    port: "80"
+
+- name: 放行 Node Exporter 端口
+  ufw:
+    rule: allow
+    port: "9100"
+
+- name: 启用防火墙
+  ufw:
+    state: enabled
+    policy: deny

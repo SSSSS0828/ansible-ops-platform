@@ -1,0 +1,5 @@
+---
+- hosts: all
+  gather_facts: yes
+  tasks:
+    - import_tasks: /app/roles/init/tasks/main.yml

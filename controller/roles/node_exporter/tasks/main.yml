@@ -1,0 +1,36 @@
+---
+- name: 下载 node_exporter
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz"
+    dest: /tmp/node_exporter.tar.gz
+    timeout: 60
+
+- name: 解压 node_exporter
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: 复制二进制文件到 /usr/local/bin
+  copy:
+    src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    mode: '0755'
+    remote_src: yes
+
+# 容器里没有 systemd，直接用 nohup 后台启动
+# 为什么：Docker 容器 PID 1 是 sshd，不是 systemd，
+# systemctl 命令会直接报错，只能用传统方式后台运行
+- name: 检查 node_exporter 是否已在运行
+  shell: pgrep -x node_exporter
+  register: pgrep_result
+  ignore_errors: yes
+
+- name: 启动 node_exporter
+  shell: nohup /usr/local/bin/node_exporter > /var/log/node_exporter.log 2>&1 &
+  when: pgrep_result.rc != 0
+
+- name: 等待 node_exporter 启动
+  wait_for:
+    port: 9100
+    timeout: 10
