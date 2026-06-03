@@ -10,13 +10,13 @@
 ## 项目截图
 
 ### Flask 运维平台
-![Flask平台执行成功](docs/flask_success.png)
+![Flask平台执行成功](docs/flask.png)
 
 ### Prometheus 采集状态
-![Prometheus三节点全部UP](docs/prometheus_targets.png)
+![Prometheus三节点全部UP](docs/prometheus.png)
 
 ### Grafana 监控面板
-![Grafana节点监控面板](docs/grafana_dashboard.png)
+![Grafana节点监控面板](docs/grafana.png)
 
 ---
 
