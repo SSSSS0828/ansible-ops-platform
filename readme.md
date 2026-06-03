@@ -162,7 +162,7 @@ docker compose version
 ### 第一步：建立目录结构
 
 ```bash
-git clone https://github.com/你的用户名/ansible-ops-platform.git
+git clone https://github.com/SSSSS0828/ansible-ops-platform.git
 cd ansible-ops-platform
 
 mkdir -p controller/inventory
