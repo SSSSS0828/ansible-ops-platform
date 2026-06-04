@@ -164,15 +164,6 @@ docker compose version
 ```bash
 git clone https://github.com/SSSSS0828/ansible-ops-platform.git
 cd ansible-ops-platform
-
-mkdir -p controller/inventory
-mkdir -p controller/roles/init/tasks
-mkdir -p controller/roles/node_exporter/tasks
-mkdir -p controller/playbooks
-mkdir -p controller/templates
-mkdir -p prometheus
-mkdir -p grafana/provisioning
-mkdir -p node
 ```
 
 验证：
