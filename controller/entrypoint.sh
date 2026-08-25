@@ -21,7 +21,11 @@ for host in node1 node2 node3; do
     wait_for_ssh "$host"
     sshpass -p "$OPS_BOOTSTRAP_PASSWORD" ssh-copy-id \
         -i /root/.ssh/id_ed25519.pub \
+        -o ConnectTimeout=5 \
+        -o PreferredAuthentications=password \
+        -o PubkeyAuthentication=no \
         -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
         "root@$host"
 done
 

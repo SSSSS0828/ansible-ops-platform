@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """运行中的 Compose 平台端到端验收。"""
 
 import json

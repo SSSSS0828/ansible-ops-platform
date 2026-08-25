@@ -51,7 +51,16 @@ jobs:
           OPS_BOOTSTRAP_PASSWORD: ci-lab-password
           GRAFANA_ADMIN_PASSWORD: ci-grafana-password
         run: |
-          trap 'docker compose down -v' EXIT
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              docker compose ps
+              docker compose logs --no-color
+            fi
+            docker compose down -v
+            exit "$status"
+          }
+          trap cleanup EXIT
           docker compose up --build -d
           python scripts/test_platform.py
           docker compose ps

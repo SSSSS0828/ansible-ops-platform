@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && mkdir -p /run/sshd /var/log/supervisor
 
 COPY supervisord.conf /etc/supervisor/supervisord.conf
+COPY sshd_config.d/99-ops-lab.conf /etc/ssh/sshd_config.d/99-ops-lab.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
