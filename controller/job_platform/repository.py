@@ -2,7 +2,7 @@
 
 import json
 import sqlite3
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +10,8 @@ TERMINAL_STATUSES = frozenset({"succeeded", "failed"})
 
 
 def utc_now() -> str:
-    return datetime.now(UTC).isoformat()
+    # timezone.utc 在 Python 3.10 与 3.11 均可用，保持控制器镜像和开发环境一致。
+    return datetime.now(timezone.utc).isoformat()
 
 
 class JobRepository:
