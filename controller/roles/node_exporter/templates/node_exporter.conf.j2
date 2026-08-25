@@ -1,0 +1,7 @@
+[program:node_exporter]
+command=/usr/local/bin/node_exporter
+autostart=true
+autorestart=true
+startretries=3
+stdout_logfile=/var/log/node_exporter.log
+stderr_logfile=/var/log/node_exporter.err.log

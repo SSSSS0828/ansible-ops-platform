@@ -1,60 +1,84 @@
-services:
+name: ansible-ops-platform
 
+x-node-common: &node-common
+  build: ./node
+  environment:
+    OPS_BOOTSTRAP_PASSWORD: ${OPS_BOOTSTRAP_PASSWORD:?请在 .env 配置实验节点初始密码}
+  networks: [ops-net]
+  restart: unless-stopped
+
+services:
   node1:
-    build: ./node
+    <<: *node-common
     container_name: node1
     hostname: node1
-    networks:
-      - ops-net
 
   node2:
-    build: ./node
+    <<: *node-common
     container_name: node2
     hostname: node2
-    networks:
-      - ops-net
 
   node3:
-    build: ./node
+    <<: *node-common
     container_name: node3
     hostname: node3
-    networks:
-      - ops-net
 
   controller:
     build: ./controller
     container_name: controller
-    networks:
-      - ops-net
+    environment:
+      OPS_BOOTSTRAP_PASSWORD: ${OPS_BOOTSTRAP_PASSWORD:?请配置实验节点初始密码}
+      OPS_DB_PATH: /data/jobs.db
+      OPS_RUNNER_DATA: /data/runner
+      OPS_PLAYBOOK_DIR: /app/playbooks
+      OPS_INVENTORY: /app/inventory/hosts.ini
+      ANSIBLE_CONFIG: /app/ansible.cfg
+    networks: [ops-net]
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - controller-data:/data
     depends_on:
-      - node1
-      - node2
-      - node3
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
+      node3:
+        condition: service_healthy
+    restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.2.1
     container_name: prometheus
-    networks:
-      - ops-net
+    networks: [ops-net]
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.5.2
     container_name: grafana
-    networks:
-      - ops-net
-    ports:
-      - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?请配置 Grafana 管理员密码}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    networks: [ops-net]
+    ports:
+      - "127.0.0.1:3000:3000"
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [prometheus]
+    restart: unless-stopped
 
 networks:
   ops-net:
     driver: bridge
+
+volumes:
+  controller-data:
+  prometheus-data:
+  grafana-data:

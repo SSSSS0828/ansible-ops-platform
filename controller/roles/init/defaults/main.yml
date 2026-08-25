@@ -1,0 +1,6 @@
+---
+init_ops_user: ops
+init_system_timezone: Asia/Shanghai
+init_packages:
+  - curl
+  - vim

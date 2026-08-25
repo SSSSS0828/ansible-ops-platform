@@ -1,0 +1,10 @@
+---
+- name: Reread supervisor configuration  # noqa command-instead-of-module
+  ansible.builtin.command: supervisorctl reread
+  changed_when: true
+  listen: Reload node exporter supervisor program
+
+- name: Apply supervisor configuration  # noqa command-instead-of-module
+  ansible.builtin.command: supervisorctl update
+  changed_when: true
+  listen: Reload node exporter supervisor program

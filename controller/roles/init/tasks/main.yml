@@ -1,45 +1,32 @@
 ---
 - name: 安装基础工具
-  apt:
-    name:
-      - ufw
-      - curl
-      - vim
+  ansible.builtin.apt:
+    name: "{{ init_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
 
-- name: 创建运维用户 ops
-  user:
-    name: ops
+- name: 创建运维用户
+  ansible.builtin.user:
+    name: "{{ init_ops_user }}"
     shell: /bin/bash
-    create_home: yes
+    create_home: true
 
-- name: 配置 ops 用户免密 sudo
-  lineinfile:
-    path: /etc/sudoers
-    line: "ops ALL=(ALL) NOPASSWD:ALL"
+- name: 使用独立 sudoers 文件配置实验权限
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ init_ops_user }}"
+    content: "{{ init_ops_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
     validate: "visudo -cf %s"
 
-- name: 设置时区为上海
-  timezone:
-    name: Asia/Shanghai
+- name: 链接系统时区文件
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ init_system_timezone }}"
+    dest: /etc/localtime
+    state: link
+    force: true
 
-- name: 放行 SSH 端口
-  ufw:
-    rule: allow
-    port: "22"
-
-- name: 放行 HTTP 端口
-  ufw:
-    rule: allow
-    port: "80"
-
-- name: 放行 Node Exporter 端口
-  ufw:
-    rule: allow
-    port: "9100"
-
-- name: 启用防火墙
-  ufw:
-    state: enabled
-    policy: deny
+- name: 写入系统时区名称
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    content: "{{ init_system_timezone }}\n"
+    mode: "0644"

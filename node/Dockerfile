@@ -2,25 +2,19 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 提前装好 SSH 和常用工具，不在容器启动时安装
-# 为什么：每次启动现装要花几十秒，导致 controller 等待超时
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     openssh-server \
-    netcat-openbsd \
     python3 \
     sudo \
-    && rm -rf /var/lib/apt/lists/*
+    supervisor \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /run/sshd /var/log/supervisor
 
-# 创建 sshd 运行所需目录
-RUN mkdir -p /run/sshd
+COPY supervisord.conf /etc/supervisor/supervisord.conf
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# 设置 root 密码
-RUN echo 'root:root123' | chpasswd
-
-# 允许 root 登录和密码认证（后续 Ansible 会加固）
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-
-EXPOSE 22
-
-CMD ["/usr/sbin/sshd", "-D"]
+EXPOSE 22 9100
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/22'
+CMD ["/entrypoint.sh"]

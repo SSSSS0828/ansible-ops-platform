@@ -1,83 +1,104 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-    <meta charset="UTF-8">
-    <title>Ansible 运维平台</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ansible 自动化任务平台</title>
     <style>
-        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
-        h1 { color: #4ec9b0; }
-        select, button { padding: 8px 16px; margin: 5px; font-size: 14px; }
-        button { background: #0e639c; color: white; border: none; cursor: pointer; border-radius: 4px; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        #log { background: #0d0d0d; border: 1px solid #333; padding: 15px;
-               height: 400px; overflow-y: auto; white-space: pre-wrap;
-               font-size: 13px; margin-top: 15px; }
-        .success { color: #4ec9b0; }
-        .failed  { color: #f44747; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #333; padding: 8px 12px; text-align: left; }
-        th { background: #2d2d2d; color: #9cdcfe; }
+      :root { color-scheme: dark; font-family: Inter, "Microsoft YaHei", sans-serif; --panel:#111d2d; --line:#2a3a50; --cyan:#57d9e8; --green:#8de067; --red:#ff6b7a; --muted:#91a2b8; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:#07111e; color:#eef4fb; }
+      main { width:min(1200px, calc(100% - 32px)); margin:auto; padding:42px 0 70px; }
+      header { display:flex; justify-content:space-between; align-items:end; margin-bottom:26px; }
+      h1 { margin:7px 0 0; font-size:38px; } h2 { margin-top:0; }
+      .eyebrow { color:var(--cyan); font:700 11px ui-monospace,monospace; letter-spacing:.16em; }
+      .subtle { color:var(--muted); }
+      .grid { display:grid; grid-template-columns:360px 1fr; gap:16px; }
+      .card { border:1px solid var(--line); background:var(--panel); padding:22px; }
+      label { display:block; margin:15px 0 6px; color:var(--muted); font-size:12px; }
+      select,button { width:100%; padding:11px; border:1px solid var(--line); background:#0a1524; color:#fff; }
+      button { margin-top:18px; border-color:#377b87; background:#123642; cursor:pointer; }
+      button:disabled { opacity:.5; cursor:wait; }
+      #log { height:390px; overflow:auto; white-space:pre-wrap; font:12px/1.55 ui-monospace,monospace; background:#050b13; padding:15px; border:1px solid var(--line); }
+      .status { display:inline-block; padding:4px 8px; border:1px solid var(--line); font:10px ui-monospace,monospace; }
+      .succeeded { color:var(--green); } .failed { color:var(--red); } .running,.queued { color:var(--cyan); }
+      table { width:100%; border-collapse:collapse; margin-top:18px; font-size:12px; }
+      th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; }
+      th { color:var(--muted); }
+      .history { margin-top:16px; }
+      @media(max-width:850px){ .grid{grid-template-columns:1fr;} header{display:block;} }
     </style>
-</head>
-<body>
-    <h1>Ansible 自动化运维平台</h1>
-
-    <div>
-        <label>Playbook：</label>
-        <select id="playbook">
-            <option value="init">init（服务器初始化）</option>
-            <option value="node_exporter">node_exporter（部署监控）</option>
-        </select>
-
-        <label>目标主机组：</label>
-        <select id="hosts">
-            <option value="monitored">monitored（全部节点）</option>
-            <option value="webservers">webservers（node1）</option>
-            <option value="dbservers">dbservers（node2）</option>
-        </select>
-
-        <button id="runBtn" onclick="runPlaybook()">▶ 执行</button>
-    </div>
-
-    <div id="log">等待执行...</div>
-
-    <h2>执行历史</h2>
-    <table>
-        <tr><th>时间</th><th>Playbook</th><th>目标</th><th>状态</th><th>耗时(s)</th></tr>
-        {% for row in history %}
-        <tr>
-            <td>{{ row[1] }}</td>
-            <td>{{ row[2] }}</td>
-            <td>{{ row[3] }}</td>
-            <td class="{{ row[4] }}">{{ row[4] }}</td>
-            <td>{{ row[5] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
+  </head>
+  <body>
+    <main>
+      <header>
+        <div><span class="eyebrow">ANSIBLE JOB PLATFORM</span><h1>自动化任务与幂等验证</h1></div>
+        <span class="subtle">REST 创建任务 · SSE 事件 · SQLite 审计</span>
+      </header>
+      <section class="grid">
+        <form class="card" id="job-form">
+          <h2>创建任务</h2>
+          <p class="subtle">所有 Playbook、目标组和运行模式均由服务端白名单提供。</p>
+          <label for="playbook">Playbook</label><select id="playbook"></select>
+          <label for="target">目标组</label><select id="target"></select>
+          <label for="mode">运行模式</label><select id="mode"></select>
+          <button id="submit" type="submit">提交任务</button>
+        </form>
+        <article class="card">
+          <h2>结构化执行事件 <span class="status" id="current-status">idle</span></h2>
+          <div id="log">等待任务...</div>
+        </article>
+      </section>
+      <section class="card history">
+        <h2>执行历史</h2>
+        <table><thead><tr><th>任务</th><th>Playbook</th><th>目标</th><th>模式</th><th>状态</th><th>幂等</th></tr></thead><tbody id="history"></tbody></table>
+      </section>
+    </main>
     <script>
-        const socket = io();
-        const logDiv = document.getElementById('log');
+      const form = document.getElementById("job-form");
+      const submit = document.getElementById("submit");
+      const log = document.getElementById("log");
+      const status = document.getElementById("current-status");
+      const eventTypes = ["job_queued","job_started","phase_started","runner_on_ok","runner_on_failed","runner_on_unreachable","runner_on_skipped","playbook_on_stats","job_done"];
 
-        socket.on('log', function(data) {
-            logDiv.textContent += data.data;
-            logDiv.scrollTop = logDiv.scrollHeight;
-        });
-
-        socket.on('done', function(data) {
-            logDiv.textContent += '\n--- 执行' + data.status + '，耗时 ' + data.duration + ' 秒 ---\n';
-            document.getElementById('runBtn').disabled = false;
-            setTimeout(() => location.reload(), 2000);
-        });
-
-        function runPlaybook() {
-            const playbook = document.getElementById('playbook').value;
-            const hosts    = document.getElementById('hosts').value;
-            logDiv.textContent = '正在执行...\n';
-            document.getElementById('runBtn').disabled = true;
-            socket.emit('run_playbook', { playbook, hosts });
-        }
+      async function json(url, options) {
+        const response = await fetch(url, { headers:{"Content-Type":"application/json"}, ...options });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+        return body;
+      }
+      function fill(id, items) {
+        document.getElementById(id).innerHTML = items.map(item => `<option value="${item.id}">${item.name}</option>`).join("");
+      }
+      async function loadCatalog() {
+        const catalog = await json("/api/catalog");
+        fill("playbook", catalog.playbooks); fill("target", catalog.target_groups); fill("mode", catalog.modes);
+      }
+      async function loadHistory() {
+        const jobs = await json("/api/jobs");
+        document.getElementById("history").innerHTML = jobs.map(job => `<tr><td>${job.id.slice(0,12)}</td><td>${job.playbook_id}</td><td>${job.target_group}</td><td>${job.mode}</td><td class="${job.status}">${job.status}</td><td>${job.summary.idempotent === null ? "-" : job.summary.idempotent ? "通过" : "失败"}</td></tr>`).join("");
+      }
+      function watch(job) {
+        log.textContent = ""; status.textContent = job.status; status.className = `status ${job.status}`;
+        const stream = new EventSource(`/api/jobs/${job.id}/events`);
+        eventTypes.forEach(type => stream.addEventListener(type, event => {
+          const item = JSON.parse(event.data);
+          const prefix = [item.host, item.task].filter(Boolean).join(" / ");
+          log.textContent += `[${item.sequence}] ${item.event_type}${prefix ? ` · ${prefix}` : ""}${item.stdout ? `\n${item.stdout}` : ""}\n`;
+          log.scrollTop = log.scrollHeight;
+          status.textContent = item.status || type; status.className = `status ${item.status || ""}`;
+          if (type === "job_done") { stream.close(); submit.disabled = false; loadHistory(); }
+        }));
+        stream.onerror = () => { if (stream.readyState === EventSource.CLOSED) submit.disabled = false; };
+      }
+      form.addEventListener("submit", async event => {
+        event.preventDefault(); submit.disabled = true;
+        try {
+          const job = await json("/api/jobs", { method:"POST", body:JSON.stringify({ playbook_id:document.getElementById("playbook").value, target_group:document.getElementById("target").value, mode:document.getElementById("mode").value }) });
+          watch(job); loadHistory();
+        } catch (error) { log.textContent = error.message; submit.disabled = false; }
+      });
+      Promise.all([loadCatalog(), loadHistory()]);
     </script>
-</body>
+  </body>
 </html>
