@@ -50,6 +50,9 @@ def submit(mode: str) -> dict[str, Any]:
         {"playbook_id": "node_exporter", "target_group": "monitored", "mode": mode},
     )
     completed = wait_job(job["id"])
+    if completed["status"] != "succeeded":
+        with urlopen(f"{BASE_URL}/api/jobs/{job['id']}/events", timeout=15) as response:
+            print(response.read().decode("utf-8"))
     assert completed["status"] == "succeeded", completed
     return completed
 
