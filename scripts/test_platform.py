@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """运行中的 Compose 平台端到端验收。"""
 
+import base64
 import json
+import os
 import time
 from typing import Any
 from urllib.error import URLError
@@ -32,6 +34,40 @@ def wait_url(url: str, timeout_seconds: int = 180) -> None:
         except (OSError, URLError, TimeoutError):
             time.sleep(2)
     raise RuntimeError(f"服务未在时限内就绪: {url}")
+
+
+def wait_prometheus_targets(timeout_seconds: int = 90) -> list[dict[str, Any]]:
+    """等待首次抓取完成，避免在 Prometheus ready 后立即读取到 unknown。"""
+
+    deadline = time.monotonic() + timeout_seconds
+    node_targets: list[dict[str, Any]] = []
+    while time.monotonic() < deadline:
+        with urlopen("http://127.0.0.1:9090/api/v1/targets", timeout=10) as response:
+            targets = json.load(response)
+        node_targets = [
+            item
+            for item in targets["data"]["activeTargets"]
+            if item["labels"].get("job") == "node_exporter"
+        ]
+        if len(node_targets) == 3 and all(
+            item["health"] == "up" for item in node_targets
+        ):
+            return node_targets
+        time.sleep(2)
+    raise RuntimeError(f"Prometheus targets 未全部恢复为 UP: {node_targets}")
+
+
+def grafana_json(path: str) -> Any:
+    """使用 CI 注入的管理员密码验收只读的自动配置结果。"""
+
+    password = os.environ["GRAFANA_ADMIN_PASSWORD"]
+    credentials = base64.b64encode(f"admin:{password}".encode()).decode()
+    request = Request(
+        f"http://127.0.0.1:3000{path}",
+        headers={"Authorization": f"Basic {credentials}"},
+    )
+    with urlopen(request, timeout=10) as response:
+        return json.load(response)
 
 
 def wait_job(job_id: str, timeout_seconds: int = 300) -> dict[str, Any]:
@@ -70,18 +106,15 @@ def main() -> None:
     )
 
     wait_url("http://127.0.0.1:9090/-/ready")
-    targets = json.loads(
-        urlopen("http://127.0.0.1:9090/api/v1/targets", timeout=10).read()
-    )
-    node_targets = [
-        item
-        for item in targets["data"]["activeTargets"]
-        if item["labels"].get("job") == "node_exporter"
-    ]
-    assert len(node_targets) == 3
-    assert all(item["health"] == "up" for item in node_targets)
+    wait_prometheus_targets()
     wait_url("http://127.0.0.1:3000/api/health")
-    print("platform passed: apply -> verify changed=0 -> 3 Prometheus targets up")
+    datasource = grafana_json("/api/datasources/name/Prometheus")
+    dashboard = grafana_json("/api/dashboards/uid/ansible-managed-nodes")
+    assert datasource["url"] == "http://prometheus:9090"
+    assert dashboard["dashboard"]["title"] == "Ansible Managed Nodes"
+    print(
+        "platform passed: apply -> verify changed=0 -> 3 targets up -> Grafana provisioned"
+    )
 
 
 if __name__ == "__main__":
