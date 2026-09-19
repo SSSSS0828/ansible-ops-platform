@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - name: 安装并检查任务平台
+      - name: 安装并检查任务实验
         run: |
           python -m pip install -r controller/requirements-dev.txt
           python -m ruff check controller scripts
@@ -29,9 +29,12 @@ jobs:
         env:
           OPS_BOOTSTRAP_PASSWORD: ci-lab-password
           GRAFANA_ADMIN_PASSWORD: ci-grafana-password
+          OPS_VAULT_PASSWORD: lab-demo-vault
           ANSIBLE_ROLES_PATH: ${{ github.workspace }}/controller/roles
         run: |
-          python -m pip install ansible-core ansible-lint yamllint
+          python -m pip install ansible-core ansible-lint yamllint passlib
+          printf '%s' "$OPS_VAULT_PASSWORD" > /tmp/ops-vault-pass
+          export ANSIBLE_VAULT_PASSWORD_FILE=/tmp/ops-vault-pass
           ansible-playbook -i controller/inventory/hosts.ini controller/playbooks/init.yml --syntax-check
           ansible-playbook -i controller/inventory/hosts.ini controller/playbooks/node_exporter.yml --syntax-check
           ansible-lint controller/playbooks controller/roles
@@ -50,6 +53,7 @@ jobs:
         env:
           OPS_BOOTSTRAP_PASSWORD: ci-lab-password
           GRAFANA_ADMIN_PASSWORD: ci-grafana-password
+          OPS_VAULT_PASSWORD: lab-demo-vault
         run: |
           cleanup() {
             status=$?

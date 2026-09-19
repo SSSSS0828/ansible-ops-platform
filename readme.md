@@ -1,27 +1,27 @@
-# Ansible Ops Platform
+# Ansible 任务实验
 
-一个面向 DevOps 求职展示的轻量自动化任务平台。它不是把 `ansible-playbook` 塞进同步 Web 请求，而是将执行过程拆成可追踪任务：
+一个可重复的本地 Ansible 实验：用网页提交白名单任务，后台执行，并验证 Playbook 是否幂等。
 
-> REST 创建任务 → 后台 Ansible Runner 执行 → SQLite 保存结构化事件 → SSE 实时展示 → recap 与幂等结果留档
+> 选择任务 → 后台 Ansible Runner 执行 → SQLite 记下事件 → 页面用中文展示进度 → `verify` 要求第二次 `changed=0`
 
-## 能解决什么问题
-
-- 通过服务端目录选择 Playbook、目标组和运行模式，客户端不能提交任意路径或命令。
-- 支持 `check`、`apply` 和 `verify` 三种模式。
-- 同一目标组一次只允许一个运行任务，避免重复变更。
-- 使用 Ansible Runner 事件回调获取主机、任务、状态和 changed，而不是解析彩色终端文本。
-- SQLite 持久保存任务、事件、耗时和 recap，容器重建后历史仍保留。
-- Prometheus 自动采集三个节点，Grafana 自动加载数据源和 Dashboard。
+这不是运维平台。仓库里只有两个 Role：`init`（装基础软件、建运维用户、统一时区）和 `node_exporter`（安装固定版本并交给 Supervisor）。
 
 ## 三种运行模式
 
 | 模式 | 行为 | 用途 |
 |---|---|---|
-| `check` | 使用 `--check --diff` | 变更前预检 |
+| `check` | `--check --diff` | 预检，不改机器 |
 | `apply` | 正常执行一次 | 应用配置 |
-| `verify` | 连续执行两次 | 第二次 `changed=0` 才通过幂等验证 |
+| `verify` | 连续执行两次 | 第二次 `changed=0` 才通过 |
 
-`verify` 是项目的核心演示点：它把“Playbook 应该幂等”变成可以自动验证和留档的结果。
+推荐顺序：先 `check`，再 `apply`，再 `verify`。
+
+## 现有任务
+
+- `init`：安装 curl/vim，用 Vault 里的密码创建 `ops` 用户，设置 `Asia/Shanghai`
+- `node_exporter`：下载校验过的 Node Exporter，用 Supervisor 拉起 9100 端口
+
+客户端不能提交任意路径或命令，只能选服务端目录里的 Playbook、目标组和模式。
 
 ## 快速启动
 
@@ -31,53 +31,58 @@
 git clone https://github.com/SSSSS0828/ansible-ops-platform.git
 cd ansible-ops-platform
 cp .env.example .env
-# 修改 .env 中的两个实验密码
 docker compose up --build -d
 ```
 
+`.env.example` 里的密码只用于本实验，不要用在真实主机。
+
 本机访问：
 
-- 任务平台：`http://127.0.0.1:5000`
+- 任务页：`http://127.0.0.1:5000`
 - Prometheus：`http://127.0.0.1:9090`
 - Grafana：`http://127.0.0.1:3000`
 
 推荐演示：
 
-1. 对 `monitored` 目标执行 `node_exporter / check`，展示预检。
-2. 执行 `node_exporter / apply`，观察三个节点的结构化任务事件。
-3. 执行 `node_exporter / verify`，展示第二轮 `changed=0`。
-4. 打开 Prometheus targets，确认三个节点为 UP。
-5. 打开 Grafana，Dashboard 已自动加载，无需手工导入。
+1. 对 `monitored` 执行 `node_exporter` / `check`，看预检。
+2. 再 `apply`，看三个节点上的任务进度。
+3. 再 `verify`，确认第二轮 `changed=0`。
+4. 打开 Prometheus targets，三个节点应为 UP。
+5. Grafana 会自动加载数据源和 Dashboard。
+
+## 保险库
+
+运维用户密码放在加密的 `controller/inventory/group_vars/all/vault.yml`，变量名是 `vault_ops_password`。
+
+解密密码来自环境变量 `OPS_VAULT_PASSWORD`，容器启动时写成 `ANSIBLE_VAULT_PASSWORD_FILE`，仓库不保存这份密码文件。首次 SSH 公钥分发仍用 `.env` 里的 `OPS_BOOTSTRAP_PASSWORD`，和 Vault 分开。
+
+查看或改保险库（实验密码见 `.env.example`）：
+
+```bash
+printf '%s' "$OPS_VAULT_PASSWORD" > /tmp/ops-vault-pass
+ansible-vault view controller/inventory/group_vars/all/vault.yml --vault-password-file /tmp/ops-vault-pass
+```
 
 ## 架构
 
 ```mermaid
 flowchart LR
-    UI["Web 页面"] -->|"POST /api/jobs"| API["Flask REST API"]
-    UI <-->|"SSE 事件"| API
+    UI["任务页"] -->|"POST /api/jobs"| API["Flask"]
+    UI <-->|"SSE"| API
     API --> SERVICE["JobService"]
     SERVICE --> RUNNER["Ansible Runner"]
-    SERVICE --> DB[("SQLite jobs/events")]
-    RUNNER -->|"SSH"| NODES["3 个 Ubuntu 节点"]
-    PROM["Prometheus"] -->|"每 15 秒采集"| NODES
+    SERVICE --> DB[("SQLite")]
+    RUNNER -->|"SSH"| NODES["3 个实验节点"]
+    PROM["Prometheus"] -->|"每 15 秒"| NODES
     GRAFANA["Grafana"] --> PROM
 ```
 
-## API
+## 边界
 
-- `GET /api/catalog`：返回允许的 Playbook、目标组和模式。
-- `POST /api/jobs`：创建任务，输入 `{playbook_id, target_group, mode}`。
-- `GET /api/jobs`：查询最近任务。
-- `GET /api/jobs/{id}`：查询任务状态和 recap。
-- `GET /api/jobs/{id}/events`：使用 SSE 获取事件，支持 `Last-Event-ID` 或 `after` 续读。
-
-## 安全与工程边界
-
-- Playbook、Inventory 目标和模式均经过白名单校验。
-- 节点密码和 Grafana 密码只从 `.env` 注入，仓库不保存固定密码。
-- Web、Prometheus、Grafana 默认只绑定 `127.0.0.1`。
-- 实验节点仍允许内网 root 密码完成首次 SSH 公钥分发；节点端口不会发布到宿主机。
-- 单进程使用两个后台执行线程，适合学习和作品演示；生产环境应改用队列、分布式锁和统一身份系统。
+- Playbook、目标和模式都走白名单。
+- Web / Prometheus / Grafana 只绑定 `127.0.0.1`。
+- 节点密码、Vault 密码、Grafana 密码只从 `.env` 注入。
+- 单进程两个后台线程，适合本机演示；没有登录、队列或多控制节点。
 
 ## 测试
 
@@ -88,12 +93,6 @@ python -m venv .venv
 .venv/bin/python -m pytest controller/tests
 ```
 
-GitHub Actions 还会执行：
+GitHub Actions 还会做 Playbook 语法检查、ansible-lint、真实 `compose up`，以及 `apply → verify` 和三个 Node Exporter target 为 UP。
 
-- Playbook syntax check、ansible-lint、yamllint
-- Docker Compose 配置检查
-- 真实启动六个服务
-- 执行 `apply → verify`，断言第二次 `changed=0`
-- 验证 Prometheus 中三个 Node Exporter targets 全部为 UP
-
-更多讲解见[面试指南](docs/interview-guide.md)。
+讲解见 [面试指南](docs/interview-guide.md)。

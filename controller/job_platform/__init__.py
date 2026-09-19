@@ -1,4 +1,4 @@
-"""Ansible 自动化任务平台。"""
+"""Ansible 任务实验。"""
 
 from job_platform.web import create_app
 

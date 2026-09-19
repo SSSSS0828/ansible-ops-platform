@@ -3,101 +3,267 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ansible 自动化任务平台</title>
+    <title>Ansible 任务实验</title>
     <style>
-      :root { color-scheme: dark; font-family: Inter, "Microsoft YaHei", sans-serif; --panel:#111d2d; --line:#2a3a50; --cyan:#57d9e8; --green:#8de067; --red:#ff6b7a; --muted:#91a2b8; }
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        --bg: #121417;
+        --panel: #1b1f24;
+        --line: #2c333c;
+        --text: #e8edf2;
+        --muted: #93a0ad;
+        --accent: #6ea8fe;
+        --green: #7dcea0;
+        --red: #f1948a;
+        --wait: #f7dc6f;
+      }
       * { box-sizing: border-box; }
-      body { margin:0; background:#07111e; color:#eef4fb; }
-      main { width:min(1200px, calc(100% - 32px)); margin:auto; padding:42px 0 70px; }
-      header { display:flex; justify-content:space-between; align-items:end; margin-bottom:26px; }
-      h1 { margin:7px 0 0; font-size:38px; } h2 { margin-top:0; }
-      .eyebrow { color:var(--cyan); font:700 11px ui-monospace,monospace; letter-spacing:.16em; }
-      .subtle { color:var(--muted); }
-      .grid { display:grid; grid-template-columns:360px 1fr; gap:16px; }
-      .card { border:1px solid var(--line); background:var(--panel); padding:22px; }
-      label { display:block; margin:15px 0 6px; color:var(--muted); font-size:12px; }
-      select,button { width:100%; padding:11px; border:1px solid var(--line); background:#0a1524; color:#fff; }
-      button { margin-top:18px; border-color:#377b87; background:#123642; cursor:pointer; }
-      button:disabled { opacity:.5; cursor:wait; }
-      #log { height:390px; overflow:auto; white-space:pre-wrap; font:12px/1.55 ui-monospace,monospace; background:#050b13; padding:15px; border:1px solid var(--line); }
-      .status { display:inline-block; padding:4px 8px; border:1px solid var(--line); font:10px ui-monospace,monospace; }
-      .succeeded { color:var(--green); } .failed { color:var(--red); } .running,.queued { color:var(--cyan); }
-      table { width:100%; border-collapse:collapse; margin-top:18px; font-size:12px; }
-      th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; }
-      th { color:var(--muted); }
-      .history { margin-top:16px; }
-      @media(max-width:850px){ .grid{grid-template-columns:1fr;} header{display:block;} }
+      body { margin: 0; background: var(--bg); color: var(--text); }
+      main { width: min(1080px, calc(100% - 32px)); margin: auto; padding: 28px 0 56px; }
+      h1 { margin: 6px 0 8px; font-size: 28px; font-weight: 600; }
+      h2 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
+      .subtle { color: var(--muted); line-height: 1.5; }
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0 22px; }
+      .step { border: 1px solid var(--line); background: var(--panel); padding: 14px 16px; }
+      .step strong { display: block; margin-bottom: 6px; }
+      .grid { display: grid; grid-template-columns: 320px 1fr; gap: 14px; }
+      .card { border: 1px solid var(--line); background: var(--panel); padding: 18px; }
+      label { display: block; margin: 14px 0 6px; color: var(--muted); font-size: 13px; }
+      select, button { width: 100%; padding: 10px; border: 1px solid var(--line); background: #111418; color: var(--text); }
+      button { margin-top: 16px; background: #243044; border-color: #3d4f6a; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: wait; }
+      .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; min-height: 36px; }
+      #log { height: 360px; overflow: auto; white-space: pre-wrap; font: 13px/1.55 ui-monospace, Consolas, monospace; background: #101317; padding: 14px; border: 1px solid var(--line); }
+      .status { display: inline-block; margin-left: 8px; padding: 2px 8px; border: 1px solid var(--line); font-size: 12px; }
+      .succeeded { color: var(--green); }
+      .failed { color: var(--red); }
+      .running, .queued { color: var(--wait); }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+      th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+      th { color: var(--muted); font-weight: 500; }
+      .history { margin-top: 14px; }
+      .ok { color: var(--green); }
+      .changed { color: var(--wait); }
+      @media (max-width: 850px) {
+        .grid, .steps { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
     <main>
       <header>
-        <div><span class="eyebrow">ANSIBLE JOB PLATFORM</span><h1>自动化任务与幂等验证</h1></div>
-        <span class="subtle">REST 创建任务 · SSE 事件 · SQLite 审计</span>
+        <h1>Ansible 任务实验</h1>
+        <p class="subtle">先预检，再执行，再验证第二次有没有变更。只能选择下面目录里的任务，不能提交任意命令。</p>
       </header>
+      <section class="steps" aria-label="推荐顺序">
+        <div class="step"><strong>1. 预检 check</strong><span class="subtle">看会改什么，不改机器</span></div>
+        <div class="step"><strong>2. 执行 apply</strong><span class="subtle">真正跑一遍 Playbook</span></div>
+        <div class="step"><strong>3. 验证 verify</strong><span class="subtle">连跑两次，第二次 changed 必须为 0</span></div>
+      </section>
       <section class="grid">
         <form class="card" id="job-form">
-          <h2>创建任务</h2>
-          <p class="subtle">所有 Playbook、目标组和运行模式均由服务端白名单提供。</p>
-          <label for="playbook">Playbook</label><select id="playbook"></select>
-          <label for="target">目标组</label><select id="target"></select>
-          <label for="mode">运行模式</label><select id="mode"></select>
-          <button id="submit" type="submit">提交任务</button>
+          <h2>提交任务</h2>
+          <p class="subtle">任务、目标和模式都来自服务端白名单。</p>
+          <label for="playbook">任务</label>
+          <select id="playbook"></select>
+          <p class="hint" id="playbook-hint"></p>
+          <label for="target">目标</label>
+          <select id="target"></select>
+          <label for="mode">模式</label>
+          <select id="mode"></select>
+          <p class="hint" id="mode-hint"></p>
+          <button id="submit" type="submit">按当前选择开始</button>
         </form>
         <article class="card">
-          <h2>结构化执行事件 <span class="status" id="current-status">idle</span></h2>
-          <div id="log">等待任务...</div>
+          <h2>执行过程 <span class="status" id="current-status">未开始</span></h2>
+          <div id="log">还没有任务。按上面的 1 → 2 → 3 选一次模式再提交。</div>
         </article>
       </section>
       <section class="card history">
-        <h2>执行历史</h2>
-        <table><thead><tr><th>任务</th><th>Playbook</th><th>目标</th><th>模式</th><th>状态</th><th>幂等</th></tr></thead><tbody id="history"></tbody></table>
+        <h2>最近任务</h2>
+        <table>
+          <thead>
+            <tr><th>任务</th><th>目标</th><th>模式</th><th>状态</th><th>幂等</th></tr>
+          </thead>
+          <tbody id="history"></tbody>
+        </table>
       </section>
     </main>
     <script>
       const form = document.getElementById("job-form");
       const submit = document.getElementById("submit");
       const log = document.getElementById("log");
-      const status = document.getElementById("current-status");
-      const eventTypes = ["job_queued","job_started","phase_started","runner_on_ok","runner_on_failed","runner_on_unreachable","runner_on_skipped","playbook_on_stats","job_done"];
+      const statusEl = document.getElementById("current-status");
+      const playbookHint = document.getElementById("playbook-hint");
+      const modeHint = document.getElementById("mode-hint");
+      const eventTypes = [
+        "job_queued", "job_started", "phase_started", "runner_on_ok",
+        "runner_on_failed", "runner_on_unreachable", "runner_on_skipped",
+        "playbook_on_stats", "job_done"
+      ];
+      const eventLabels = {
+        job_queued: "任务已排队",
+        job_started: "开始执行",
+        phase_started: "进入阶段",
+        runner_on_ok: "任务成功",
+        runner_on_failed: "任务失败",
+        runner_on_unreachable: "主机不可达",
+        runner_on_skipped: "已跳过",
+        playbook_on_stats: "本轮汇总",
+        job_done: "任务结束"
+      };
+      const statusLabels = {
+        idle: "未开始",
+        queued: "排队",
+        running: "执行中",
+        succeeded: "成功",
+        failed: "失败",
+        ok: "成功",
+        recap: "汇总",
+        info: "进行中"
+      };
+      const modeLabels = {
+        check: "预检",
+        apply: "执行",
+        verify: "验证幂等"
+      };
+      let catalogNames = { playbooks: {}, targets: {}, modes: {} };
 
       async function json(url, options) {
-        const response = await fetch(url, { headers:{"Content-Type":"application/json"}, ...options });
+        const response = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
         return body;
       }
-      function fill(id, items) {
-        document.getElementById(id).innerHTML = items.map(item => `<option value="${item.id}">${item.name}</option>`).join("");
+
+      function fill(id, items, label) {
+        const select = document.getElementById(id);
+        select.innerHTML = items.map((item) =>
+          `<option value="${item.id}">${item.name}</option>`
+        ).join("");
+        items.forEach((item) => { catalogNames[label][item.id] = item.name; });
+        return items;
       }
+
+      function setHints(playbooks, modes) {
+        const playbook = document.getElementById("playbook");
+        const mode = document.getElementById("mode");
+        const update = () => {
+          const selectedPlaybook = playbooks.find((item) => item.id === playbook.value);
+          const selectedMode = modes.find((item) => item.id === mode.value);
+          playbookHint.textContent = selectedPlaybook ? selectedPlaybook.description : "";
+          modeHint.textContent = selectedMode ? selectedMode.description : "";
+        };
+        playbook.addEventListener("change", update);
+        mode.addEventListener("change", update);
+        update();
+      }
+
       async function loadCatalog() {
         const catalog = await json("/api/catalog");
-        fill("playbook", catalog.playbooks); fill("target", catalog.target_groups); fill("mode", catalog.modes);
+        const playbooks = fill("playbook", catalog.playbooks, "playbooks");
+        fill("target", catalog.target_groups, "targets");
+        const modes = fill("mode", catalog.modes, "modes");
+        setHints(playbooks, modes);
       }
+
+      function idempotentText(value) {
+        if (value === true) return "通过";
+        if (value === false) return "未通过";
+        return "—";
+      }
+
+      function statusText(value) {
+        return statusLabels[value] || value || "进行中";
+      }
+
       async function loadHistory() {
         const jobs = await json("/api/jobs");
-        document.getElementById("history").innerHTML = jobs.map(job => `<tr><td>${job.id.slice(0,12)}</td><td>${job.playbook_id}</td><td>${job.target_group}</td><td>${job.mode}</td><td class="${job.status}">${job.status}</td><td>${job.summary.idempotent === null ? "-" : job.summary.idempotent ? "通过" : "失败"}</td></tr>`).join("");
+        document.getElementById("history").innerHTML = jobs.map((job) => {
+          const name = catalogNames.playbooks[job.playbook_id] || job.playbook_id;
+          const target = catalogNames.targets[job.target_group] || job.target_group;
+          const mode = modeLabels[job.mode] || job.mode;
+          return `<tr>
+            <td>${name}</td>
+            <td>${target}</td>
+            <td>${mode}</td>
+            <td class="${job.status}">${statusText(job.status)}</td>
+            <td>${idempotentText(job.summary && job.summary.idempotent)}</td>
+          </tr>`;
+        }).join("");
       }
+
+      function eventLine(item) {
+        const label = eventLabels[item.event_type] || item.event_type;
+        const parts = [label];
+        if (item.host) parts.push(item.host);
+        if (item.task) parts.push(item.task);
+        if (item.changed === true) parts.push("有变更");
+        if (item.changed === false && item.event_type === "runner_on_ok") parts.push("无变更");
+        let line = parts.join(" · ");
+        if (item.event_type === "job_done") {
+          if (item.status === "succeeded") {
+            line = item.stdout && item.stdout.includes("幂等")
+              ? "结束：成功"
+              : "结束：成功";
+            if (item.stdout) line += `。${item.stdout}`;
+          } else {
+            line = `结束：失败。${item.stdout || "执行未通过"}`;
+          }
+        }
+        return line;
+      }
+
       function watch(job) {
-        log.textContent = ""; status.textContent = job.status; status.className = `status ${job.status}`;
+        log.textContent = "";
+        statusEl.textContent = statusText(job.status);
+        statusEl.className = `status ${job.status}`;
         const stream = new EventSource(`/api/jobs/${job.id}/events`);
-        eventTypes.forEach(type => stream.addEventListener(type, event => {
+        eventTypes.forEach((type) => stream.addEventListener(type, (event) => {
           const item = JSON.parse(event.data);
-          const prefix = [item.host, item.task].filter(Boolean).join(" / ");
-          log.textContent += `[${item.sequence}] ${item.event_type}${prefix ? ` · ${prefix}` : ""}${item.stdout ? `\n${item.stdout}` : ""}\n`;
+          log.textContent += `${eventLine(item)}\n`;
           log.scrollTop = log.scrollHeight;
-          status.textContent = item.status || type; status.className = `status ${item.status || ""}`;
-          if (type === "job_done") { stream.close(); submit.disabled = false; loadHistory(); }
+          if (item.status) {
+            statusEl.textContent = statusText(item.status);
+            statusEl.className = `status ${item.status}`;
+          }
+          if (type === "job_done") {
+            if (item.status === "failed" && item.stdout && item.stdout.includes("幂等")) {
+              log.textContent += "结论：第二次仍有变更，幂等未通过。\n";
+            } else if (item.status === "succeeded") {
+              log.textContent += "结论：本轮检查结束。\n";
+            }
+            stream.close();
+            submit.disabled = false;
+            loadHistory();
+          }
         }));
-        stream.onerror = () => { if (stream.readyState === EventSource.CLOSED) submit.disabled = false; };
+        stream.onerror = () => {
+          if (stream.readyState === EventSource.CLOSED) submit.disabled = false;
+        };
       }
-      form.addEventListener("submit", async event => {
-        event.preventDefault(); submit.disabled = true;
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submit.disabled = true;
         try {
-          const job = await json("/api/jobs", { method:"POST", body:JSON.stringify({ playbook_id:document.getElementById("playbook").value, target_group:document.getElementById("target").value, mode:document.getElementById("mode").value }) });
-          watch(job); loadHistory();
-        } catch (error) { log.textContent = error.message; submit.disabled = false; }
+          const job = await json("/api/jobs", {
+            method: "POST",
+            body: JSON.stringify({
+              playbook_id: document.getElementById("playbook").value,
+              target_group: document.getElementById("target").value,
+              mode: document.getElementById("mode").value
+            })
+          });
+          watch(job);
+          loadHistory();
+        } catch (error) {
+          log.textContent = error.message;
+          submit.disabled = false;
+        }
       });
+
       Promise.all([loadCatalog(), loadHistory()]);
     </script>
   </body>

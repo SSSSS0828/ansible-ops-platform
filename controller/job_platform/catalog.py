@@ -14,7 +14,7 @@ class PlaybookDefinition:
 PLAYBOOKS = {
     "init": PlaybookDefinition(
         id="init",
-        name="服务器初始化",
+        name="初始化节点",
         playbook="init.yml",
         description="安装基础工具、创建运维用户并统一时区。",
     ),
@@ -33,9 +33,15 @@ TARGET_GROUPS = {
 }
 
 MODES = {
-    "check": "预检并展示 diff，不修改节点",
-    "apply": "正常应用配置",
-    "verify": "连续执行两次，第二次 changed=0 才通过",
+    "check": "预检，不改机器",
+    "apply": "执行一次",
+    "verify": "连跑两次，第二次 changed 必须为 0",
+}
+
+MODE_LABELS = {
+    "check": "1. 预检",
+    "apply": "2. 执行",
+    "verify": "3. 验证幂等",
 }
 
 
@@ -47,5 +53,12 @@ def public_catalog() -> dict[str, object]:
         "target_groups": [
             {"id": group_id, "name": name} for group_id, name in TARGET_GROUPS.items()
         ],
-        "modes": [{"id": mode_id, "name": name} for mode_id, name in MODES.items()],
+        "modes": [
+            {
+                "id": mode_id,
+                "name": MODE_LABELS[mode_id],
+                "description": description,
+            }
+            for mode_id, description in MODES.items()
+        ],
     }

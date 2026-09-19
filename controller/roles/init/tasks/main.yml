@@ -8,8 +8,11 @@
 - name: 创建运维用户
   ansible.builtin.user:
     name: "{{ init_ops_user }}"
+    password: "{{ vault_ops_password | password_hash('sha512') }}"
     shell: /bin/bash
     create_home: true
+    update_password: always
+  no_log: true
 
 - name: 使用独立 sudoers 文件配置实验权限
   ansible.builtin.copy:

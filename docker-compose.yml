@@ -28,6 +28,7 @@ services:
     container_name: controller
     environment:
       OPS_BOOTSTRAP_PASSWORD: ${OPS_BOOTSTRAP_PASSWORD:?请配置实验节点初始密码}
+      OPS_VAULT_PASSWORD: ${OPS_VAULT_PASSWORD:?请配置 Vault 实验密码}
       OPS_DB_PATH: /data/jobs.db
       OPS_RUNNER_DATA: /data/runner
       OPS_PLAYBOOK_DIR: /app/playbooks

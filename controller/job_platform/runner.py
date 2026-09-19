@@ -1,5 +1,6 @@
 """Ansible Runner 适配器，将回调事件转换为平台稳定结构。"""
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -73,11 +74,19 @@ class AnsibleRunnerAdapter:
             ident=f"{job_id}-{phase}",
             cmdline=cmdline,
             event_handler=handle_event,
-            envvars={"ANSIBLE_HOST_KEY_CHECKING": "False"},
+            envvars=_runner_env(),
             quiet=True,
             rotate_artifacts=20,
         )
         return RunnerResult(return_code=int(result.rc or 0), recap=recap)
+
+
+def _runner_env() -> dict[str, str]:
+    env = {"ANSIBLE_HOST_KEY_CHECKING": "False"}
+    vault_file = os.getenv("ANSIBLE_VAULT_PASSWORD_FILE")
+    if vault_file:
+        env["ANSIBLE_VAULT_PASSWORD_FILE"] = vault_file
+    return env
 
 
 def _event_status(event_type: str) -> str:

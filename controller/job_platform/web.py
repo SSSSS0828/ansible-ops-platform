@@ -35,7 +35,7 @@ def create_app(
 
     @app.get("/healthz")
     def healthz() -> tuple[dict[str, str], int]:
-        return {"status": "ok", "service": "ansible-job-platform"}, 200
+        return {"status": "ok", "service": "ansible-task-lab"}, 200
 
     @app.get("/api/catalog")
     def catalog() -> Response:

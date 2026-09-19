@@ -2,6 +2,11 @@
 set -euo pipefail
 
 : "${OPS_BOOTSTRAP_PASSWORD:?必须通过环境变量配置实验节点初始密码}"
+: "${OPS_VAULT_PASSWORD:?必须通过环境变量配置 Vault 实验密码}"
+
+printf '%s' "$OPS_VAULT_PASSWORD" > /tmp/ops-vault-pass
+chmod 600 /tmp/ops-vault-pass
+export ANSIBLE_VAULT_PASSWORD_FILE=/tmp/ops-vault-pass
 
 wait_for_ssh() {
     local host="$1"

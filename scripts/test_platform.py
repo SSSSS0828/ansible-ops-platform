@@ -113,7 +113,7 @@ def main() -> None:
     assert datasource["url"] == "http://prometheus:9090"
     assert dashboard["dashboard"]["title"] == "Ansible Managed Nodes"
     print(
-        "platform passed: apply -> verify changed=0 -> 3 targets up -> Grafana provisioned"
+        "lab passed: apply -> verify changed=0 -> 3 targets up -> Grafana provisioned"
     )
 
 

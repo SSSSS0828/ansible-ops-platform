@@ -1,0 +1,2 @@
+# 明文变量。密码只放在同目录的 vault.yml。
+init_ops_user_comment: 实验运维用户，密码来自 Vault
